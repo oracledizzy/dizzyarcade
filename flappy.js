@@ -2,8 +2,6 @@
 
 Object.assign(ArcadeApp.prototype, {
 
-  get_active_flappy_colors() { return [YELLOW]; },
-
   spawn_pipe() {
     const gap = 160;
     const top_height = 80 + Math.floor(Math.random() * 241);   // 80..320

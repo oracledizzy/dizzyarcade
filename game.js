@@ -47,9 +47,42 @@ class ArcadeApp {
     this.tokens = this.high_scores.TOKENS ?? 0;
     this.energy = this.high_scores.ENERGY ?? 0;
     this.unlocked_themes = this.high_scores.UNLOCKED_THEMES ?? ['navy','pink','green'];
-    this.unlocked_levels = this.high_scores.UNLOCKED_LEVELS ?? [];
-    this.multiplier_expiry = 0;
-    this.multiplier_value = 1;
+    // TEMPORARY: Esoteric Snake and Alt Dimension are Store purchases, and the
+    // Store is not ported yet, so they would be unreachable. Unlock them by
+    // default until the Store lands, then delete this and restore `?? []`.
+    this.unlocked_levels = this.high_scores.UNLOCKED_LEVELS ?? ['esoteric_snake', 'flappy_alt_dimension'];
+
+    this.unlocked_snakes = this.high_scores.UNLOCKED_SNAKES ?? [];
+    this.active_snake_id = this.high_scores.ACTIVE_SNAKE ?? null;
+    this.unlocked_flappy = this.high_scores.UNLOCKED_FLAPPY ?? [];
+    this.active_flappy_id = this.high_scores.ACTIVE_FLAPPY ?? null;
+    this.unlocked_si = this.high_scores.UNLOCKED_SI ?? [];
+    this.active_si_id = this.high_scores.ACTIVE_SI ?? null;
+
+    this.active_multiplier = this.high_scores.ACTIVE_MULTIPLIER ?? 1;
+    this.multiplier_expiry = this.high_scores.MULTIPLIER_EXPIRY ?? 0;
+
+    // Snake Levels campaign (1-99), tracked separately from Infinite mode.
+    this.snake_level_progress = this.high_scores.SNAKE_LEVEL_PROGRESS ?? 1;
+    this.snake_level_milestone_claimed = this.high_scores.SNAKE_LEVEL_MILESTONE ?? 0;
+    this.snake_level_token_milestone_claimed = this.high_scores.SNAKE_LEVEL_TOKEN_MILESTONE ?? 0;
+    this.snake_level99_reward_claimed = this.high_scores.SNAKE_LEVEL99_REWARD ?? false;
+    this.snake_level_lives = this.high_scores.SNAKE_LEVEL_LIVES ?? 3;
+    this.snake_level_selected = this.snake_level_progress;
+    this.current_snake_level = 1;
+
+    // Sword Arena permanent upgrades, kept across deaths.
+    this.arena_bonus_hp = this.high_scores.ARENA_BONUS_HP ?? 0;
+    this.arena_bonus_damage = this.high_scores.ARENA_BONUS_DAMAGE ?? 0;
+    this.arena_bonus_speed = this.high_scores.ARENA_BONUS_SPEED ?? 0;
+    this.arena_bonus_sword = this.high_scores.ARENA_BONUS_SWORD ?? 0;
+    this.arena_best_wave = this.high_scores.ARENA_BEST_WAVE ?? 0;
+    this.arena_champion_reward_claimed = this.high_scores.ARENA_CHAMPION_REWARD ?? false;
+
+    this.bj_custom_bet = this.high_scores.BJ_CUSTOM_BET ?? 100;
+
+    this.customize_tab = 'SNAKE';
+    this.store_tab = 'THEMES';
 
     this.audio.setVolumeTier(this.high_scores.VOLUME_TIER ?? 'MID');
     this.inverted = this.high_scores.INVERTED ?? false;
@@ -72,6 +105,26 @@ class ArcadeApp {
     d.ENERGY = this.energy;
     d.UNLOCKED_THEMES = this.unlocked_themes;
     d.UNLOCKED_LEVELS = this.unlocked_levels;
+    d.UNLOCKED_SNAKES = this.unlocked_snakes;
+    d.ACTIVE_SNAKE = this.active_snake_id;
+    d.UNLOCKED_FLAPPY = this.unlocked_flappy;
+    d.ACTIVE_FLAPPY = this.active_flappy_id;
+    d.UNLOCKED_SI = this.unlocked_si;
+    d.ACTIVE_SI = this.active_si_id;
+    d.ACTIVE_MULTIPLIER = this.active_multiplier;
+    d.MULTIPLIER_EXPIRY = this.multiplier_expiry;
+    d.SNAKE_LEVEL_PROGRESS = this.snake_level_progress;
+    d.SNAKE_LEVEL_MILESTONE = this.snake_level_milestone_claimed;
+    d.SNAKE_LEVEL_TOKEN_MILESTONE = this.snake_level_token_milestone_claimed;
+    d.SNAKE_LEVEL99_REWARD = this.snake_level99_reward_claimed;
+    d.SNAKE_LEVEL_LIVES = this.snake_level_lives;
+    d.ARENA_BONUS_HP = this.arena_bonus_hp;
+    d.ARENA_BONUS_DAMAGE = this.arena_bonus_damage;
+    d.ARENA_BONUS_SPEED = this.arena_bonus_speed;
+    d.ARENA_BONUS_SWORD = this.arena_bonus_sword;
+    d.ARENA_BEST_WAVE = this.arena_best_wave;
+    d.ARENA_CHAMPION_REWARD = this.arena_champion_reward_claimed;
+    d.BJ_CUSTOM_BET = this.bj_custom_bet;
     d.VOLUME_TIER = this.audio.volumeTier;
     d.INVERTED = this.inverted;
     d.THEME_HUE = this.theme_hue;
@@ -86,7 +139,8 @@ class ArcadeApp {
   }
 
   get_active_multiplier() {
-    return (Date.now()/1000 < this.multiplier_expiry) ? this.multiplier_value : 1;
+    return (this.multiplier_expiry && Date.now()/1000 < this.multiplier_expiry)
+      ? this.active_multiplier : 1;
   }
 
   play_sound(name) { this.audio.play(name); }
@@ -173,8 +227,14 @@ class ArcadeApp {
   }
 
   _wireKeys() {
+    // Games that need held keys (Pong, Invaders, Arena) read this set the
+    // way the desktop build read its own pressed_keys.
+    this.pressed = new Set();
+    window.addEventListener('keyup', e => this.pressed.delete(e.key));
+    window.addEventListener('blur', () => this.pressed.clear());
     window.addEventListener('keydown', e => {
       const k = e.key;
+      this.pressed.add(k);
       if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(k)) e.preventDefault();
       if (this.onKey && this.onKey(k)) return;
       if (!this.menu_active) return;
@@ -200,6 +260,9 @@ class ArcadeApp {
     this.esc_back_command = null;
     this.clearSwipeHandler();
     this.clearTapHandler();
+    this.clearDragHandler();
+    if (this.clearPongTouch) this.clearPongTouch();
+    if (this.clearArenaTouch) this.clearArenaTouch();
     this.canvas.delete('all');
   }
 
@@ -515,12 +578,43 @@ Object.assign(ArcadeApp.prototype, {
     this._tap = null;
   },
 
+  // Continuous drag: reports the finger position in virtual coords while it
+  // is down, plus whether anything is currently touching.
+  setDragHandler(fn) {
+    this.clearDragHandler();
+    const el = this.canvas.el;
+    this.dragging = false;
+    const send = e => fn(this.canvas.toVirtual(e.clientX, e.clientY));
+    const down = e => { this.dragging = true; el.setPointerCapture?.(e.pointerId); send(e); };
+    const move = e => { if (this.dragging) send(e); };
+    const up = () => { this.dragging = false; };
+    this._drag = { down, move, up };
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+  },
+
+  clearDragHandler() {
+    if (!this._drag) return;
+    const el = this.canvas.el;
+    el.removeEventListener('pointerdown', this._drag.down);
+    el.removeEventListener('pointermove', this._drag.move);
+    el.removeEventListener('pointerup', this._drag.up);
+    el.removeEventListener('pointercancel', this._drag.up);
+    this._drag = null;
+    this.dragging = false;
+  },
+
   // --- end of run ---------------------------------------------------------
   end_game(message) {
     this.game_running = false;
     if (this.game_job) { clearTimeout(this.game_job); this.game_job = null; }
     this.clearSwipeHandler();
     this.clearTapHandler();
+    this.clearDragHandler();
+    if (this.clearPongTouch) this.clearPongTouch();
+    if (this.clearArenaTouch) this.clearArenaTouch();
     this.onKey = null;
 
     const theme = this.get_theme();

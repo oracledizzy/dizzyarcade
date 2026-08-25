@@ -18,11 +18,30 @@ so the rendering and input layers were rewritten rather than wrapped:
 Touch is primary: swipe to turn in Snake, tap to flap in Flappy, tap the
 MENU chip to quit a run. Arrow keys, space and Escape still work on desktop.
 
+## Games
+
+All nine modes are playable: Snake (Infinite, Levels 1-99, Esoteric), Flappy
+Bird (standard and Alt Dimension), Pong, Space Invaders, Sword Arena, and
+Blackjack.
+
+Touch schemes are new work rather than ports, since every input in the
+desktop build was a key:
+
+| Mode | Control |
+|---|---|
+| Snake, Snake Levels, Esoteric | swipe to turn |
+| Flappy, Alt Dimension | tap to flap |
+| Pong | each player drags on their own half |
+| Space Invaders | drag to move, fires automatically |
+| Sword Arena | virtual joystick, held attack pad |
+| Blackjack | buttons |
+
 ## Not yet ported
 
-Pong, Space Invaders, Sword Arena, Blackjack, and the Store / Customize /
-Other screens are stubs. `starwars_music` is omitted until Space Invaders
-lands.
+The Store, Customize and Other screens are stubs. Because the Store is where
+Esoteric Snake and Alt Dimension are bought, both are temporarily unlocked by
+default — see the TEMPORARY note in `game.js`. `starwars_music` is omitted
+until the Other screen lands.
 
 ## Running locally
 

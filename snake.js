@@ -107,18 +107,7 @@ Object.assign(ArcadeApp.prototype, {
     this.snake_bg_tier_seen = 0;
     this.snake_bg_announce_ticks = 0;
 
-    const OPPOSITE = { Up:'Down', Down:'Up', Left:'Right', Right:'Left' };
-    const turn = d => { if (OPPOSITE[d] !== this.snake_dir) this.snake_next_dir = d; };
-
-    this.onKey = k => {
-      const map = { ArrowUp:'Up', ArrowDown:'Down', ArrowLeft:'Left', ArrowRight:'Right' };
-      if (map[k]) { turn(map[k]); return true; }
-      if (k === 'Escape') { this.quit_to_menu(); return true; }
-      return false;
-    };
-    this.setSwipeHandler(turn);
-    this.esc_back_command = () => this.quit_to_menu();
-
+    this.bindSnakeControls();
     this.run_snake_loop();
   },
 
@@ -180,10 +169,7 @@ Object.assign(ArcadeApp.prototype, {
       this.canvas.create_text(cx, cy, { text:'$', fill:BLACK, font:['Arial',9,'bold'] });
     }
 
-    this.snake.forEach(([sx,sy], i) => {
-      const color = i === 0 ? GREEN : theme.secondary;
-      this.canvas.create_rectangle(sx, sy, sx+20, sy+20, { fill:color, outline:theme.bg });
-    });
+    this.draw_snake_body(theme);
 
     this.draw_snake_bg_announce(bg_tier);
     this.drawQuitButton(theme);
