@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dizzy Arcade">
+<meta name="theme-color" content="#0b0b0f">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+<title>Dizzy Arcade</title>
+<style>
+  html,body {
+    margin:0; padding:0; height:100%; overflow:hidden;
+    background:#0b0b0f; overscroll-behavior:none;
+    -webkit-user-select:none; user-select:none;
+    -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent;
+    touch-action:none;
+  }
+  canvas { display:block; }
+  #start {
+    position:fixed; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:18px;
+    background:#0b0b0f; color:#f2f2f5; z-index:10;
+    font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;
+  }
+  #start h1 { font-size:clamp(28px,9vw,46px); font-weight:400; margin:0; letter-spacing:1px; }
+  #start p  { color:#7a7a85; font-size:14px; margin:0; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<!-- iOS refuses to start audio outside a user gesture, so the first tap
+     doubles as the audio unlock. -->
+<div id="start">
+  <h1>DIZZY ARCADE</h1>
+  <p>tap to start</p>
+</div>
+
+<script src="tkcanvas.js?v=3"></script>
+<script src="audio.js?v=3"></script>
+<script src="game.js?v=3"></script>
+<script src="snake.js?v=3"></script>
+<script src="flappy.js?v=3"></script>
+<script>
+const canvasEl = document.getElementById('c');
+const tk = new TkCanvas(canvasEl);
+const audio = new AudioEngine();
+const app = new ArcadeApp(tk, audio);
+
+document.getElementById('start').addEventListener('pointerdown', () => {
+  audio.unlock();
+  document.getElementById('start').remove();
+  app.show_main_menu();
+}, { once:true });
+
+(function loop() { tk.render(); requestAnimationFrame(loop); })();
+</script>
+</body>
+</html>

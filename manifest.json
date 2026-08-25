@@ -1,0 +1,10 @@
+{
+  "name": "Dizzy Arcade",
+  "short_name": "Dizzy Arcade",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0b0b0f",
+  "theme_color": "#0b0b0f",
+  "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png" }]
+}
