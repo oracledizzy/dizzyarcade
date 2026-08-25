@@ -27,6 +27,7 @@ Object.assign(ArcadeApp.prototype, {
 
   start_space_invaders() {
     this.clear_screen();
+    this.layout_game();
     const theme = this.get_theme();
     this.canvas.configure({ bg: theme.bg });
     this.play_music('sound/snake_music.m4a');

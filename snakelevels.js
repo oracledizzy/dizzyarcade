@@ -31,16 +31,34 @@ Object.assign(ArcadeApp.prototype, {
   },
 
   bindSnakeControls() {
-    const OPPOSITE = { Up:'Down', Down:'Up', Left:'Right', Right:'Left' };
-    const turn = d => { if (OPPOSITE[d] !== this.snake_dir) this.snake_next_dir = d; };
+    this.turn_queue = [];
     this.onKey = k => {
       const map = { ArrowUp:'Up', ArrowDown:'Down', ArrowLeft:'Left', ArrowRight:'Right' };
-      if (map[k]) { turn(map[k]); return true; }
+      if (map[k]) { this.queue_turn(map[k]); return true; }
       if (k === 'Escape') { this.quit_to_menu(); return true; }
       return false;
     };
-    this.setSwipeHandler(turn);
+    this.setSwipeHandler(d => this.queue_turn(d));
     this.esc_back_command = () => this.quit_to_menu();
+  },
+
+  // Queues against the last *queued* direction rather than the one currently
+  // being drawn, so a second turn in the same tick is judged against where
+  // the snake will actually be facing when it lands.
+  queue_turn(d) {
+    const OPPOSITE = { Up:'Down', Down:'Up', Left:'Right', Right:'Left' };
+    const ref = this.turn_queue.length
+      ? this.turn_queue[this.turn_queue.length - 1]
+      : this.snake_dir;
+    if (d === ref || d === OPPOSITE[ref]) return;
+    if (this.turn_queue.length >= TURN_QUEUE_MAX) return;
+    this.turn_queue.push(d);
+  },
+
+  // Called once per tick in place of the old single-slot snake_next_dir.
+  consume_turn() {
+    if (this.turn_queue && this.turn_queue.length) this.snake_dir = this.turn_queue.shift();
+    return this.snake_dir;
   },
 
   // --- level generation ---------------------------------------------------
@@ -60,7 +78,9 @@ Object.assign(ArcadeApp.prototype, {
   },
 
   get_level_coin_multiplier(level) { return 1 + (level - 1) * 0.15; },
-  get_level_start_speed(level) { return Math.max(60, 100 - level * 0.35); },
+  get_level_start_speed(level) {
+    return Math.max(SNAKE_LEVEL_FLOOR_MS, SNAKE_LEVEL_START_MS - level * SNAKE_LEVEL_RAMP);
+  },
 
   spawn_food_avoiding(obstacles) {
     while (true) {
@@ -94,6 +114,7 @@ Object.assign(ArcadeApp.prototype, {
     this.current_snake_level = level;
 
     this.clear_screen();
+    this.layout_game();
     const theme = this.get_theme();
     this.canvas.configure({ bg: theme.bg });
     this.play_music('sound/snake_music.m4a');
@@ -101,7 +122,6 @@ Object.assign(ArcadeApp.prototype, {
     this.game_type = 'SNAKE_LEVEL';
     this.game_running = true;
     this.snake_dir = 'Right';
-    this.snake_next_dir = 'Right';
     this.score = 0;
     this.snake = [[100,100],[80,100],[60,100]];
     this.snake_level_obstacles = this.generate_level_obstacles(level);
@@ -113,8 +133,8 @@ Object.assign(ArcadeApp.prototype, {
     this.snake_level_coin_mult = this.get_level_coin_multiplier(level);
 
     this.snake_speed_ms = this.get_level_start_speed(level);
-    this.snake_min_speed_ms = 40;
-    this.snake_speed_step_ms = 1.5;
+    this.snake_min_speed_ms = SNAKE_LEVEL_FLOOR_MS - 10;
+    this.snake_speed_step_ms = SNAKE_STEP_MS;
     this.snake_bg_tier_seen = 0;
     this.snake_bg_announce_ticks = 0;
 
@@ -129,7 +149,7 @@ Object.assign(ArcadeApp.prototype, {
     this.canvas.configure({ bg: theme.bg });
     const bg_tier = this.update_snake_bg_tier(this.score);
     this.draw_snake_background(theme, bg_tier);
-    this.snake_dir = this.snake_next_dir;
+    this.consume_turn();
 
     let [hx, hy] = this.snake[0];
     if (this.snake_dir === 'Up') hy -= 20;
@@ -199,6 +219,7 @@ Object.assign(ArcadeApp.prototype, {
     if (this.game_job) { clearTimeout(this.game_job); this.game_job = null; }
     this.clearSwipeHandler();
     this.onKey = null;
+    this.layout_menu();
 
     if (this.session_tokens_earned > 0) this.add_tokens(this.session_tokens_earned);
 
@@ -271,6 +292,7 @@ Object.assign(ArcadeApp.prototype, {
     if (this.game_job) { clearTimeout(this.game_job); this.game_job = null; }
     this.clearSwipeHandler();
     this.onKey = null;
+    this.layout_menu();
 
     // Levels pay out only on completion — coins from a failed run are forfeited.
     const forfeited = this.session_tokens_earned;
@@ -390,6 +412,7 @@ Object.assign(ArcadeApp.prototype, {
     this.saveHighScores();
 
     this.clear_screen();
+    this.layout_game();
     const theme = this.get_theme();
     this.canvas.configure({ bg: theme.bg });
     this.play_music('sound/snake_music.m4a');
@@ -397,16 +420,15 @@ Object.assign(ArcadeApp.prototype, {
     this.game_type = 'ESOTERIC_SNAKE';
     this.game_running = true;
     this.snake_dir = 'Right';
-    this.snake_next_dir = 'Right';
     this.score = 0;
     this.snake = [[100,100],[80,100],[60,100]];
     this.food = this.spawn_food();
 
     this.coin = null;
     this.session_tokens_earned = 0;
-    this.snake_speed_ms = 100;
-    this.snake_min_speed_ms = 55;
-    this.snake_speed_step_ms = 1.5;
+    this.snake_speed_ms = SNAKE_START_MS;
+    this.snake_min_speed_ms = SNAKE_MIN_MS;
+    this.snake_speed_step_ms = SNAKE_STEP_MS;
 
     this.es_pendulums = [];
     this.es_pendulum_spawn_timer = 10;
@@ -433,7 +455,7 @@ Object.assign(ArcadeApp.prototype, {
     this.canvas.configure({ bg: theme.bg });
     const bg_tier = this.update_snake_bg_tier(this.score);
     this.draw_snake_background(theme, bg_tier);
-    this.snake_dir = this.snake_next_dir;
+    this.consume_turn();
 
     let [hx, hy] = this.snake[0];
     if (this.snake_dir === 'Up') hy -= 20;

@@ -85,6 +85,7 @@ Object.assign(ArcadeApp.prototype, {
 
   start_snake() {
     this.clear_screen();
+    this.layout_game();
     const theme = this.get_theme();
     this.canvas.configure({ bg: theme.bg });
     this.play_music('sound/snake_music.m4a');
@@ -92,7 +93,6 @@ Object.assign(ArcadeApp.prototype, {
     this.game_type = 'SNAKE';
     this.game_running = true;
     this.snake_dir = 'Right';
-    this.snake_next_dir = 'Right';
     this.score = 0;
     this.snake = [[100,100],[80,100],[60,100]];
     this.food = this.spawn_food();
@@ -100,9 +100,9 @@ Object.assign(ArcadeApp.prototype, {
     this.coin = null;
     this.session_tokens_earned = 0;
 
-    this.snake_speed_ms = 100;
-    this.snake_min_speed_ms = 55;
-    this.snake_speed_step_ms = 1.5;
+    this.snake_speed_ms = SNAKE_START_MS;
+    this.snake_min_speed_ms = SNAKE_MIN_MS;
+    this.snake_speed_step_ms = SNAKE_STEP_MS;
 
     this.snake_bg_tier_seen = 0;
     this.snake_bg_announce_ticks = 0;
@@ -118,7 +118,7 @@ Object.assign(ArcadeApp.prototype, {
     this.canvas.configure({ bg: theme.bg });
     const bg_tier = this.update_snake_bg_tier(this.score);
     this.draw_snake_background(theme, bg_tier);
-    this.snake_dir = this.snake_next_dir;
+    this.consume_turn();
 
     let [hx, hy] = this.snake[0];
     if (this.snake_dir === 'Up') hy -= 20;

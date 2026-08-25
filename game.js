@@ -162,14 +162,36 @@ class ArcadeApp {
     return this.canvas.create_polygon(pts, { smooth:true, ...o });
   }
 
+  // --- layout -------------------------------------------------------------
+  // Menus own the whole viewport; games keep their original 600-tall box and
+  // are simply positioned within it.
+  layout_menu() { this.canvas.originY = 0; }
+
+  layout_game() {
+    const slack = Math.max(0, this.canvas.VH - 600);
+    this.canvas.originY = slack * GAME_FIELD_BIAS;
+  }
+
+  // Evenly stacks n items in the space below `top`, centred in what's left.
+  menu_stack(n, opts = {}) {
+    const { top = 0, itemH = MENU_ITEM_H, gap = MENU_GAP, bottom = 30 } = opts;
+    const avail = Math.max(0, this.canvas.VH - bottom - top);
+    const need = n * itemH + (n - 1) * gap;
+    const start = top + Math.max(0, (avail - need) / 2);
+    return Array.from({ length: n }, (_, i) => start + itemH / 2 + i * (itemH + gap));
+  }
+
+  // Vertical centre of the usable area, for titles and one-off text.
+  vmid() { return this.canvas.VH / 2; }
+
   // --- menu plumbing ------------------------------------------------------
-  make_menu_item(text, command, theme, cx, cy, w=180, h=46) {
+  make_menu_item(text, command, theme, cx, cy, w=MENU_ITEM_W, h=MENU_ITEM_H) {
     const idx = this.menu_items.length;
     const tag = `menu_item_${idx}`;
     const rect = this.rounded_rect(cx-w/2, cy-h/2, cx+w/2, cy+h/2, h/2,
                                    { fill:theme.bg, outline:'', tags:[tag] });
     const tid = this.canvas.create_text(cx, cy,
-                  { text, fill:theme.muted, font:['Helvetica Neue',14], tags:[tag] });
+                  { text, fill:theme.muted, font:['Helvetica Neue',MENU_FONT], tags:[tag] });
     this.canvas.tag_bind(tag, '<Button-1>', () => this.handle_click(command));
     this.canvas.tag_bind(tag, '<Enter>', () => this.set_menu_selection(idx));
     this.menu_items.push({ rect, text:tid, type:'standard', cx, cy, w, h, command });
@@ -260,6 +282,7 @@ class ArcadeApp {
     this.clearDragHandler();
     if (this.clearPongTouch) this.clearPongTouch();
     if (this.clearArenaTouch) this.clearArenaTouch();
+    this.canvas.originY = 0;          // menus own the viewport unless a game claims it
     this.canvas.delete('all');
   }
 
@@ -282,19 +305,24 @@ class ArcadeApp {
   // --- SCREEN 1: MAIN MENU ------------------------------------------------
   show_main_menu() {
     this.clear_screen();
+    this.layout_menu();
     const theme = this.get_theme();
     this.canvas.configure({ bg: theme.bg });
     this.play_sound('menu_open');
     this.play_music('sound/menu_music.m4a');
 
     this.draw_token_header(theme);
-    this.canvas.create_text(300,140,{ text:'DIZZY ARCADE', fill:theme.text, font:['Helvetica Neue',46] });
 
-    this.make_menu_item('PLAY',      () => this.show_play_menu(),     theme, 300, 210);
-    this.make_menu_item('CUSTOMIZE', () => this.show_customize_menu(), theme, 300, 270);
-    this.make_menu_item('STORE',     () => this.show_store_menu(),     theme, 300, 330);
-    this.make_menu_item('SETTINGS',  () => this.show_settings_menu(),  theme, 300, 390);
-    this.make_menu_item('OTHER',     () => this.show_other_screen(),   theme, 300, 450);
+    const ys = this.menu_stack(5, { top: 170, bottom: 40 });
+    // title centred in the gap between the token header and the first button
+    const titleY = (66 + ys[0] - MENU_ITEM_H/2) / 2;
+    this.canvas.create_text(300, titleY, { text:'DIZZY ARCADE', fill:theme.text, font:['Helvetica Neue',44] });
+
+    this.make_menu_item('PLAY',      () => this.show_play_menu(),      theme, 300, ys[0]);
+    this.make_menu_item('CUSTOMIZE', () => this.show_customize_menu(), theme, 300, ys[1]);
+    this.make_menu_item('STORE',     () => this.show_store_menu(),     theme, 300, ys[2]);
+    this.make_menu_item('SETTINGS',  () => this.show_settings_menu(),  theme, 300, ys[3]);
+    this.make_menu_item('OTHER',     () => this.show_other_screen(),   theme, 300, ys[4]);
 
     this.menu_active = true;
     this.menu_selected_index = 0;
@@ -317,7 +345,7 @@ class ArcadeApp {
       const cmd = () => { this.theme_hue = hue; this.saveHighScores(); this.show_settings_menu(); };
       this.canvas.tag_bind(tag,'<Button-1>', () => this.handle_click(cmd));
       this.canvas.tag_bind(tag,'<Enter>', () => this.set_menu_selection(idx));
-      this.menu_items.push({ type:'custom', cx, cy, w:40, h:40, command:cmd });
+      this.menu_items.push({ type:'custom', cx, cy, w:52, h:52, command:cmd });
     });
   }
 
@@ -346,51 +374,62 @@ class ArcadeApp {
       const idx = this.menu_items.length;
       const tag = `vol_${tier}`;
       const sel = tier === this.audio.volumeTier;
-      this.rounded_rect(cx-22, cy-16, cx+22, cy+16, 16, {
+      this.rounded_rect(cx-26, cy-22, cx+26, cy+22, 20, {
         fill: sel ? theme.accent : theme.bg,
         outline: sel ? theme.accent : theme.muted, width:1, tags:[tag] });
       this.draw_minimalist_speaker(cx, cy, tier, sel ? theme.bg : theme.muted, tag);
       const cmd = () => { this.audio.setVolumeTier(tier); this.saveHighScores(); this.show_settings_menu(); };
       this.canvas.tag_bind(tag,'<Button-1>', () => this.handle_click(cmd));
       this.canvas.tag_bind(tag,'<Enter>', () => this.set_menu_selection(idx));
-      this.menu_items.push({ type:'custom', cx, cy, w:44, h:32, command:cmd });
+      this.menu_items.push({ type:'custom', cx, cy, w:52, h:44, command:cmd });
     });
   }
 
   show_settings_menu() {
     this.clear_screen();
+    this.layout_menu();
     const theme = this.get_theme();
     this.canvas.configure({ bg: theme.bg });
     this.esc_back_command = () => this.show_main_menu();
     this.play_sound('menu_open');
 
     this.draw_token_header(theme);
-    this.canvas.create_text(300,76,{ text:'SETTINGS', fill:theme.text, font:['Helvetica Neue',28] });
+
+    // One flowing column down the whole viewport rather than a cramped square.
+    const H = this.canvas.VH;
+    const pad = (H - 600) / 7;                    // spare height, shared out
+    let y = 90 + pad;
+
+    this.canvas.create_text(300, y - 34, { text:'SETTINGS', fill:theme.text, font:['Helvetica Neue',30] });
 
     this.make_menu_item(`INVERT COLORS: ${this.inverted?'ON':'OFF'}`,
       () => { this.inverted = !this.inverted; this.saveHighScores(); this.show_settings_menu(); },
-      theme, 300, 122, 220, 36);
+      theme, 300, y, 300, 56);
+    y += 56 + pad;
 
     this.make_menu_item(`MUSIC: ${this.audio.musicEnabled?'ON':'OFF'}`,
       () => { this.audio.musicEnabled = !this.audio.musicEnabled;
               if (!this.audio.musicEnabled) this.audio.stopMusic();
               else this.audio.playMusic('sound/menu_music.m4a');
               this.saveHighScores(); this.show_settings_menu(); },
-      theme, 200, 166, 190, 36);
-
-    this.make_menu_item(`SPECIAL SOUNDS: ${this.audio.specialSounds?'ON':'OFF'}`,
+      theme, 155, y, 280, 56);
+    this.make_menu_item(`SOUNDS: ${this.audio.specialSounds?'ON':'OFF'}`,
       () => { this.audio.specialSounds = !this.audio.specialSounds;
               this.saveHighScores(); this.show_settings_menu(); },
-      theme, 420, 166, 190, 36);
+      theme, 445, y, 280, 56);
+    y += 56 + pad;
 
-    this.canvas.create_text(300,214,{ text:'THEMES', fill:theme.muted, font:['Helvetica Neue',11] });
-    this.build_theme_picker(theme, 254);
+    this.canvas.create_text(300, y, { text:'THEMES', fill:theme.muted, font:['Helvetica Neue',13] });
+    this.build_theme_picker(theme, y + 46);
+    y += 46 + 40 + pad;
 
-    this.canvas.create_text(300,344,{ text:'VOLUME', fill:theme.muted, font:['Helvetica Neue',11] });
-    this.build_volume_control(theme, 394);
+    this.canvas.create_text(300, y, { text:'VOLUME', fill:theme.muted, font:['Helvetica Neue',13] });
+    this.build_volume_control(theme, y + 48);
+    y += 48 + 40 + pad;
 
-    this.make_menu_item('RESET GAME DATA', () => this.confirm_reset_game_data(), theme, 300, 474, 220, 38);
-    this.make_menu_item('< MAIN MENU', () => this.show_main_menu(), theme, 300, 559, 200, 38);
+    this.make_menu_item('RESET GAME DATA', () => this.confirm_reset_game_data(), theme, 300, y, 300, 60);
+    y += 60 + pad;
+    this.make_menu_item('< MAIN MENU', () => this.show_main_menu(), theme, 300, y, 260, 56);
 
     this.menu_active = true;
     this.menu_selected_index = 0;
@@ -490,31 +529,40 @@ Object.assign(ArcadeApp.prototype, {
   },
 
   // --- swipe input --------------------------------------------------------
-  setSwipeHandler(fn) {
+  // Fires the moment the finger crosses the threshold, mid-drag, rather than
+  // waiting for it to lift — waiting for pointerup is what made this feel
+  // laggy. After each turn the origin re-anchors to the current point, so one
+  // continuous drag can trace several turns in a row.
+  setSwipeHandler(fn, min = SWIPE_MIN_PX) {
     this.clearSwipeHandler();
-    const MIN = 24;                       // px of travel before it counts
-    let sx = 0, sy = 0, active = false;
+    let sx = 0, sy = 0, tracking = false;
 
-    const down = e => { sx = e.clientX; sy = e.clientY; active = true; };
-    const up = e => {
-      if (!active) return;
-      active = false;
+    const down = e => { sx = e.clientX; sy = e.clientY; tracking = true; };
+    const move = e => {
+      if (!tracking) return;
       const dx = e.clientX - sx, dy = e.clientY - sy;
-      if (Math.abs(dx) < MIN && Math.abs(dy) < MIN) return;
-      fn(Math.abs(dx) > Math.abs(dy)
-        ? (dx > 0 ? 'Right' : 'Left')
-        : (dy > 0 ? 'Down' : 'Up'));
+      const ax = Math.abs(dx), ay = Math.abs(dy);
+      if (ax < min && ay < min) return;
+      fn(ax > ay ? (dx > 0 ? 'Right' : 'Left') : (dy > 0 ? 'Down' : 'Up'));
+      sx = e.clientX; sy = e.clientY;      // re-anchor for the next turn
     };
+    const up = () => { tracking = false; };
 
-    this._swipe = { down, up };
-    this.canvas.el.addEventListener('pointerdown', down);
-    this.canvas.el.addEventListener('pointerup', up);
+    this._swipe = { down, move, up };
+    const el = this.canvas.el;
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
   },
 
   clearSwipeHandler() {
     if (!this._swipe) return;
-    this.canvas.el.removeEventListener('pointerdown', this._swipe.down);
-    this.canvas.el.removeEventListener('pointerup', this._swipe.up);
+    const el = this.canvas.el;
+    el.removeEventListener('pointerdown', this._swipe.down);
+    el.removeEventListener('pointermove', this._swipe.move);
+    el.removeEventListener('pointerup', this._swipe.up);
+    el.removeEventListener('pointercancel', this._swipe.up);
     this._swipe = null;
   },
 
@@ -569,6 +617,7 @@ Object.assign(ArcadeApp.prototype, {
     if (this.clearPongTouch) this.clearPongTouch();
     if (this.clearArenaTouch) this.clearArenaTouch();
     this.onKey = null;
+    this.layout_menu();                 // hand the viewport back from the game
 
     const theme = this.get_theme();
     this.canvas.delete('all');
@@ -585,16 +634,19 @@ Object.assign(ArcadeApp.prototype, {
     const session_tokens = this.session_tokens_earned ?? 0;
 
     this.draw_token_header(theme);
-    this.canvas.create_text(300,150,{ text:message, fill:RED, font:['Impact',42] });
-    this.canvas.create_text(300,220,{ text:`SCORE: ${current_score}`, fill:theme.text, font:['Helvetica Neue',20,'bold'] });
-    this.canvas.create_text(300,260,{ text:`HIGH SCORE: ${best_score}`, fill:YELLOW, font:['Helvetica Neue',16] });
+
+    // Centre the result block in whatever height the device gives us.
+    const mid = this.vmid();
+    this.canvas.create_text(300, mid-150, { text:message, fill:RED, font:['Impact',44] });
+    this.canvas.create_text(300, mid-80,  { text:`SCORE: ${current_score}`, fill:theme.text, font:['Helvetica Neue',22,'bold'] });
+    this.canvas.create_text(300, mid-38,  { text:`HIGH SCORE: ${best_score}`, fill:YELLOW, font:['Helvetica Neue',17] });
     if (session_tokens > 0)
-      this.canvas.create_text(300,300,{ text:`TOKENS COLLECTED: +${session_tokens}`, fill:GREEN, font:['Helvetica Neue',14,'bold'] });
+      this.canvas.create_text(300, mid+2, { text:`TOKENS COLLECTED: +${session_tokens}`, fill:GREEN, font:['Helvetica Neue',15,'bold'] });
 
     const again = { SNAKE: () => this.start_snake(), FLAPPY: () => this.start_flappy() }[this.game_type]
                   || (() => this.show_play_menu());
-    this.make_menu_item('PLAY AGAIN', again, theme, 300, 390, 220);
-    this.make_menu_item('GAME MENU', () => this.show_play_menu(), theme, 300, 450, 220);
+    this.make_menu_item('PLAY AGAIN', again, theme, 300, mid+90);
+    this.make_menu_item('GAME MENU', () => this.show_play_menu(), theme, 300, mid+90 + MENU_ITEM_H + MENU_GAP);
 
     this.menu_active = true;
     this.menu_selected_index = 0;

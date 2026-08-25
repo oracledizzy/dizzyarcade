@@ -9,6 +9,7 @@ Object.assign(ArcadeApp.prototype, {
 
   start_sword_arena() {
     this.clear_screen();
+    this.layout_game();
     const theme = this.get_theme();
     this.canvas.configure({ bg: theme.bg });
     this.play_music('sound/snake_music.m4a');
@@ -416,6 +417,7 @@ Object.assign(ArcadeApp.prototype, {
     if (this.game_job) { clearTimeout(this.game_job); this.game_job = null; }
     this.clearArenaTouch();
     this.onKey = null;
+    this.layout_menu();
 
     if (this.arena_run_tokens > 0) this.add_tokens(this.arena_run_tokens);
     if (this.arena_run_energy > 0) this.add_energy(this.arena_run_energy);
@@ -470,6 +472,7 @@ Object.assign(ArcadeApp.prototype, {
 
   continue_arena_next_map() {
     this.clear_screen();
+    this.layout_game();
     const theme = this.get_theme();
     this.canvas.configure({ bg: theme.bg });
     this.play_music('sound/snake_music.m4a');
@@ -505,6 +508,7 @@ Object.assign(ArcadeApp.prototype, {
     if (this.game_job) { clearTimeout(this.game_job); this.game_job = null; }
     this.clearArenaTouch();
     this.onKey = null;
+    this.layout_menu();
 
     if (this.arena_wave > this.arena_best_wave) this.arena_best_wave = this.arena_wave;
     this.saveHighScores();
