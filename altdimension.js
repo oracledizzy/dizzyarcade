@@ -39,7 +39,6 @@ Object.assign(ArcadeApp.prototype, {
 
   start_alt_dimension() {
     this.clear_screen();
-    this.layout_game();
     this.canvas.configure({ bg:'#fff4c2' });
     this.play_music('sound/flappy_music.m4a');
 

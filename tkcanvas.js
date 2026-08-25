@@ -4,12 +4,7 @@
 // this keeps a retained display list and repaints it every frame. That gives
 // delete-by-tag, itemconfig and hit-testing for tag_bind essentially for free.
 
-// The game was written for a 600-wide column. Width stays fixed at 600 so
-// every x-coordinate ports unchanged; the height is whatever the device
-// actually gives us, exposed as canvas.VH, so screens can use the full
-// screen instead of sitting in a letterboxed square.
-const VW = 600;
-const VH_MIN = 600;         // never present less height than the original had
+const VW = 600, VH = 600;   // virtual coordinate space the game was written in
 
 class TkCanvas {
   constructor(canvasEl) {
@@ -23,10 +18,6 @@ class TkCanvas {
     this.scale = 1;
     this.offX = 0;
     this.offY = 0;
-    // Games draw into their original 600-tall box; originY slides that box
-    // down the taller viewport without touching a single game coordinate.
-    this.originY = 0;
-    this.VH = VH_MIN;
     this._resize();
     window.addEventListener('resize', () => {
       this._resize();
@@ -36,20 +27,6 @@ class TkCanvas {
   }
 
   // --- layout -------------------------------------------------------------
-  // Reads the notch / home-indicator insets so nothing important is drawn
-  // underneath them.
-  _readInsets() {
-    const probe = document.createElement('div');
-    probe.style.cssText = 'position:fixed;top:0;left:0;visibility:hidden;' +
-      'padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)';
-    document.body.appendChild(probe);
-    const cs = getComputedStyle(probe);
-    const t = parseFloat(cs.paddingTop) || 0;
-    const b = parseFloat(cs.paddingBottom) || 0;
-    probe.remove();
-    return { t, b };
-  }
-
   _resize() {
     const dpr = window.devicePixelRatio || 1;
     const w = window.innerWidth, h = window.innerHeight;
@@ -58,23 +35,15 @@ class TkCanvas {
     this.el.style.width = w + 'px';
     this.el.style.height = h + 'px';
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const ins = this._readInsets();
-    const usableH = Math.max(1, h - ins.t - ins.b);
-
-    // Fit the 600-wide column, but never squeeze below the original height.
-    this.scale = Math.min(w / VW, usableH / VH_MIN);
-    this.offX = (w - VW * this.scale) / 2;   // centres the column on wide screens
-    this.offY = ins.t;
-    this.VH = usableH / this.scale;          // virtual height actually available
+    // letterbox the 600x600 square: fit, then centre
+    this.scale = Math.min(w / VW, h / VH);
+    this.offX = (w - VW * this.scale) / 2;
+    this.offY = (h - VH * this.scale) / 2;
     this.cssW = w; this.cssH = h;
   }
 
   toVirtual(clientX, clientY) {
-    return {
-      x: (clientX - this.offX) / this.scale,
-      y: (clientY - this.offY) / this.scale - this.originY,
-    };
+    return { x: (clientX - this.offX) / this.scale, y: (clientY - this.offY) / this.scale };
   }
 
   // --- item creation ------------------------------------------------------
@@ -132,7 +101,7 @@ class TkCanvas {
     const s = this.scale;
     Object.assign(rec.el.style, {
       left:   (this.offX + (rec.x - rec.w/2) * s) + 'px',
-      top:    (this.offY + (rec.y + this.originY - rec.h/2) * s) + 'px',
+      top:    (this.offY + (rec.y - rec.h/2) * s) + 'px',
       width:  (rec.w * s) + 'px',
       height: (rec.h * s) + 'px',
       fontSize: Math.max(11, Math.round(14 * s)) + 'px',
@@ -248,9 +217,8 @@ class TkCanvas {
     g.fillRect(0, 0, this.cssW, this.cssH);
     g.translate(this.offX, this.offY);
     g.scale(this.scale, this.scale);
-    // clip to the column so nothing bleeds into the side bars on wide screens
-    g.beginPath(); g.rect(0, 0, VW, this.VH); g.clip();
-    g.translate(0, this.originY);
+    // clip to the virtual screen so nothing bleeds into the letterbox bars
+    g.beginPath(); g.rect(0, 0, VW, VH); g.clip();
     for (const it of this.items) this._paint(g, it);
     g.restore();
   }

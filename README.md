@@ -13,18 +13,6 @@ so the rendering and input layers were rewritten rather than wrapped:
 - `game.js` — app shell: state, themes, menus, persistence via localStorage.
 - `snake.js` / `flappy.js` — the two ported games.
 
-## Layout
-
-The game was authored for a fixed 600x600 window. Here the width stays 600 —
-so every x-coordinate ported unchanged — while the height is whatever the
-device gives, exposed as `canvas.VH`. Menus lay themselves out down the full
-screen; games keep their original 600-tall playfield (stretching it would
-change Snake's grid and Flappy's gap tuning) and are positioned near the top
-via `canvas.originY`, leaving the space below for thumbs. Notch and
-home-indicator insets are read from `env(safe-area-inset-*)`.
-
-Feel and layout constants live in `tuning.js`.
-
 ## Controls
 
 Touch is primary: swipe to turn in Snake, tap to flap in Flappy, tap the
