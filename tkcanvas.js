@@ -11,6 +11,7 @@ class TkCanvas {
     this.el = canvasEl;
     this.ctx = canvasEl.getContext('2d');
     this.items = [];
+    this.widgets = [];       // real DOM inputs, for the tk.Entry equivalents
     this.nextId = 1;
     this.bg = '#000000';
     this.binds = {};          // tag -> { '<Button-1>': fn, ... }
@@ -18,7 +19,10 @@ class TkCanvas {
     this.offX = 0;
     this.offY = 0;
     this._resize();
-    window.addEventListener('resize', () => this._resize());
+    window.addEventListener('resize', () => {
+      this._resize();
+      for (const rec of this.widgets) this._placeWidget(rec);
+    });
     this._wireInput();
   }
 
@@ -72,10 +76,48 @@ class TkCanvas {
     it.coords = c.length === 1 && Array.isArray(c[0]) ? c[0] : c;
   }
 
+  // tkinter placed real Entry widgets on the canvas via create_window(); the
+  // browser equivalent is a positioned <input> floating above it, kept in
+  // sync with the canvas transform.
+  create_input(x, y, w, h, o = {}) {
+    const el = document.createElement('input');
+    el.type = o.password ? 'password' : 'text';
+    if (o.inputmode) el.inputMode = o.inputmode;
+    el.value = o.value ?? '';
+    Object.assign(el.style, {
+      position: 'fixed', textAlign: 'center', border: '1px solid #888',
+      borderRadius: '4px', background: '#fff', color: '#111',
+      font: '14px Arial, sans-serif', padding: '0', zIndex: '5',
+    });
+    document.body.appendChild(el);
+    const rec = { el, x, y, w, h };
+    this.widgets.push(rec);
+    this._placeWidget(rec);
+    if (o.focus) setTimeout(() => el.focus(), 0);
+    return el;
+  }
+
+  _placeWidget(rec) {
+    const s = this.scale;
+    Object.assign(rec.el.style, {
+      left:   (this.offX + (rec.x - rec.w/2) * s) + 'px',
+      top:    (this.offY + (rec.y - rec.h/2) * s) + 'px',
+      width:  (rec.w * s) + 'px',
+      height: (rec.h * s) + 'px',
+      fontSize: Math.max(11, Math.round(14 * s)) + 'px',
+    });
+  }
+
+  clearWidgets() {
+    for (const rec of this.widgets) rec.el.remove();
+    this.widgets = [];
+  }
+
   delete(tag) {
     if (tag === 'all') {
       this.items = [];
       this.binds = {};
+      this.clearWidgets();
       return;
     }
     this.items = this.items.filter(i => !i.tags.includes(tag));

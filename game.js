@@ -47,10 +47,7 @@ class ArcadeApp {
     this.tokens = this.high_scores.TOKENS ?? 0;
     this.energy = this.high_scores.ENERGY ?? 0;
     this.unlocked_themes = this.high_scores.UNLOCKED_THEMES ?? ['navy','pink','green'];
-    // TEMPORARY: Esoteric Snake and Alt Dimension are Store purchases, and the
-    // Store is not ported yet, so they would be unreachable. Unlock them by
-    // default until the Store lands, then delete this and restore `?? []`.
-    this.unlocked_levels = this.high_scores.UNLOCKED_LEVELS ?? ['esoteric_snake', 'flappy_alt_dimension'];
+    this.unlocked_levels = this.high_scores.UNLOCKED_LEVELS ?? [];
 
     this.unlocked_snakes = this.high_scores.UNLOCKED_SNAKES ?? [];
     this.active_snake_id = this.high_scores.ACTIVE_SNAKE ?? null;
@@ -294,53 +291,10 @@ class ArcadeApp {
     this.canvas.create_text(300,140,{ text:'DIZZY ARCADE', fill:theme.text, font:['Helvetica Neue',46] });
 
     this.make_menu_item('PLAY',      () => this.show_play_menu(),     theme, 300, 210);
-    this.make_menu_item('CUSTOMIZE', () => this.show_stub('CUSTOMIZE'), theme, 300, 270);
-    this.make_menu_item('STORE',     () => this.show_stub('STORE'),   theme, 300, 330);
-    this.make_menu_item('SETTINGS',  () => this.show_settings_menu(), theme, 300, 390);
-    this.make_menu_item('OTHER',     () => this.show_stub('OTHER'),   theme, 300, 450);
-
-    this.menu_active = true;
-    this.menu_selected_index = 0;
-    this.refresh_menu_highlight();
-  }
-
-  // --- SCREEN 2: GAME SELECT ----------------------------------------------
-  make_play_menu_item(text, command, theme, cy, high_score=null) {
-    const w = 220, h = 46, cx = 300;
-    const idx = this.menu_items.length;
-    const tag = `menu_item_${idx}`;
-    const rect = this.rounded_rect(cx-w/2, cy-h/2, cx+w/2, cy+h/2, h/2,
-                                   { fill:theme.bg, outline:'', tags:[tag] });
-    const tid = this.canvas.create_text(cx, high_score!==null ? cy-8 : cy,
-                  { text, fill:theme.muted, font:['Helvetica Neue',14], tags:[tag] });
-    if (high_score !== null)
-      this.canvas.create_text(cx, cy+13, { text:`BEST: ${this.format_tokens(high_score)}`,
-        fill:theme.muted, font:['Arial',9], tags:[tag] });
-    this.canvas.tag_bind(tag, '<Button-1>', () => this.handle_click(command));
-    this.canvas.tag_bind(tag, '<Enter>', () => this.set_menu_selection(idx));
-    this.menu_items.push({ rect, text:tid, type:'standard', cx, cy, w, h, command });
-  }
-
-  show_play_menu() {
-    this.clear_screen();
-    const theme = this.get_theme();
-    this.canvas.configure({ bg: theme.bg });
-    this.esc_back_command = () => this.show_main_menu();
-    this.play_sound('menu_open');
-
-    this.draw_token_header(theme);
-    this.canvas.create_text(300,80,{ text:'SELECT A GAME', fill:theme.text, font:['Helvetica Neue',28] });
-
-    const hs = this.high_scores;
-    let y = 130;
-    this.make_play_menu_item('SNAKE GAME', () => this.start_snake(), theme, y, hs.SNAKE ?? 0); y += 58;
-    this.make_play_menu_item('FLAPPY BIRD', () => this.start_flappy(), theme, y, hs.FLAPPY ?? 0); y += 58;
-    this.make_play_menu_item('PONG (2 PLAYER)', () => this.show_stub('PONG'), theme, y, hs.PONG ?? 0); y += 58;
-    this.make_play_menu_item('SPACE INVADERS', () => this.show_stub('SPACE INVADERS'), theme, y, hs.SPACE_INVADERS ?? 0); y += 58;
-    this.make_play_menu_item('SWORD ARENA', () => this.show_stub('SWORD ARENA'), theme, y, hs.ARENA_BEST_WAVE ?? 0); y += 58;
-    this.make_play_menu_item('BLACKJACK', () => this.show_stub('BLACKJACK'), theme, y, hs.BLACKJACK ?? 0); y += 58;
-
-    this.make_menu_item('< MAIN MENU', () => this.show_main_menu(), theme, 300, Math.min(y+12,565), 200);
+    this.make_menu_item('CUSTOMIZE', () => this.show_customize_menu(), theme, 300, 270);
+    this.make_menu_item('STORE',     () => this.show_store_menu(),     theme, 300, 330);
+    this.make_menu_item('SETTINGS',  () => this.show_settings_menu(),  theme, 300, 390);
+    this.make_menu_item('OTHER',     () => this.show_other_screen(),   theme, 300, 450);
 
     this.menu_active = true;
     this.menu_selected_index = 0;
@@ -479,24 +433,23 @@ class ArcadeApp {
     this.tokens = 0; this.energy = 0;
     this.unlocked_themes = ['navy','pink','green'];
     this.unlocked_levels = [];
+    this.unlocked_snakes = []; this.active_snake_id = null;
+    this.unlocked_flappy = []; this.active_flappy_id = null;
+    this.unlocked_si = [];     this.active_si_id = null;
+    this.active_multiplier = 1; this.multiplier_expiry = 0;
+    this.snake_level_progress = 1;
+    this.snake_level_milestone_claimed = 0;
+    this.snake_level_token_milestone_claimed = 0;
+    this.snake_level99_reward_claimed = false;
+    this.snake_level_lives = 3;
+    this.snake_level_selected = 1;
+    this.arena_bonus_hp = 0; this.arena_bonus_damage = 0;
+    this.arena_bonus_speed = 0; this.arena_bonus_sword = 0;
+    this.arena_best_wave = 0; this.arena_champion_reward_claimed = false;
+    this.bj_custom_bet = 100;
     this.theme_hue = 'navy'; this.inverted = false;
     this.saveHighScores();
     this.show_main_menu();
-  }
-
-  // --- placeholder for the games not yet ported ---------------------------
-  show_stub(name) {
-    this.clear_screen();
-    const theme = this.get_theme();
-    this.canvas.configure({ bg: theme.bg });
-    this.esc_back_command = () => this.show_main_menu();
-    this.draw_token_header(theme);
-    this.canvas.create_text(300,250,{ text:name, fill:theme.text, font:['Helvetica Neue',30] });
-    this.canvas.create_text(300,300,{ text:'not ported yet', fill:theme.muted, font:['Arial',13] });
-    this.make_menu_item('< BACK', () => this.show_main_menu(), theme, 300, 400, 200);
-    this.menu_active = true;
-    this.menu_selected_index = 0;
-    this.refresh_menu_highlight();
   }
 }
 

@@ -36,12 +36,16 @@ desktop build was a key:
 | Sword Arena | virtual joystick, held attack pad |
 | Blackjack | buttons |
 
-## Not yet ported
+## Screens
 
-The Store, Customize and Other screens are stubs. Because the Store is where
-Esoteric Snake and Alt Dimension are bought, both are temporarily unlocked by
-default — see the TEMPORARY note in `game.js`. `starwars_music` is omitted
-until the Other screen lands.
+Everything from the desktop build is here: main menu, game select, the Snake
+and Flappy mode trees, Settings, Customize (3 tabs), the Store (5 tabs, two
+currencies), the Other/credits screen, and the password-gated cheat menu
+behind its hidden star.
+
+The cheat menu's text fields are real HTML inputs floated over the canvas,
+since a canvas cannot draw an editable field. Note that a browser game keeps
+no secrets — the cheat password is readable in the shipped source.
 
 ## Running locally
 
